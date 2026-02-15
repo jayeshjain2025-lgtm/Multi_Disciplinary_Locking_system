@@ -1,2 +1,0 @@
-# This repository is a Node.js/TypeScript (Vite + React) application.
-# No Python packages are required for local development at this time.
