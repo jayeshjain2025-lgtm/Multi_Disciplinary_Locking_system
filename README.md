@@ -126,8 +126,3 @@ After pushing your branch:
 - [ ] npm run build
 - [ ] Manual validation
 ```
-
-## Notes
-
-- The project runs fully as a standard local Vite app.
-- No AI Studio link or AI Studio run/deploy step is required in this repository workflow.
