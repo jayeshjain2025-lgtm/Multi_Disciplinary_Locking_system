@@ -1,0 +1,5 @@
+{
+  "name": "TriLock: 3-Phase Security Control Center",
+  "description": "A sophisticated dashboard and simulation environment for a multi-layered biometric locking system, featuring proximity detection, fingerprint verification, and palm-vein recognition with AI-powered security auditing.",
+  "requestFramePermissions": []
+}
