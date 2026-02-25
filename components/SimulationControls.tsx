@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { LockPhase } from '../types';
-import { Wifi, Fingerprint, ScanFace, AlertOctagon } from 'lucide-react';
+import { RegisteredDevice, LockPhase } from '../types';
+import { Wifi, Fingerprint, ScanFace, AlertOctagon, Bluetooth, Smartphone } from 'lucide-react';
 
 interface SimulationControlsProps {
   currentPhase: LockPhase;
@@ -9,15 +9,19 @@ interface SimulationControlsProps {
   isFaultMode: boolean;
   onTrigger: (phase: LockPhase) => void;
   onToggleFault: () => void;
+  registeredDevices: RegisteredDevice[];
 }
 
 const SimulationControls: React.FC<SimulationControlsProps> = ({ 
   verifiedPhases, 
   isFaultMode, 
   onTrigger, 
-  onToggleFault 
+  onToggleFault, 
+  registeredDevices
 }) => {
-  const isPhaseVerified = (phase: LockPhase) => verifiedPhases.includes(phase);
+    const isPhaseVerified = (phase: LockPhase) => verifiedPhases.includes(phase);
+  const hasBluetooth = registeredDevices.some(d => d.type === 'BLUETOOTH');
+  const hasPhone = registeredDevices.some(d => d.type === 'PHONE');
 
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -41,50 +45,51 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-4 justify-center bg-black/40 p-4 rounded-2xl border border-white/5">
-        <button
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button
           onClick={() => onTrigger(LockPhase.PROXIMITY)}
-          className={`flex-1 min-w-[150px] group relative p-4 border rounded-xl transition-all overflow-hidden ${
+          disabled={!hasBluetooth}
+          className={`group relative p-4 border rounded-xl transition-all overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed ${
             isPhaseVerified(LockPhase.PROXIMITY) 
-            ? 'bg-cyan-900/30 border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]' 
-            : 'bg-slate-900 border-slate-800 hover:bg-cyan-900/10 hover:border-cyan-500/30'
+            ? 'bg-blue-900/30 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' 
+            : 'bg-slate-900 border-slate-800 hover:bg-blue-900/10 hover:border-blue-500/30'
           }`}
         >
           <div className="flex flex-col items-center gap-2 relative z-10">
-            <Wifi className={`w-6 h-6 transition-colors ${isPhaseVerified(LockPhase.PROXIMITY) ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-400'}`} />
+            <Bluetooth className={`w-6 h-6 transition-colors ${isPhaseVerified(LockPhase.PROXIMITY) ? 'text-blue-400' : 'text-slate-400 group-hover:text-blue-400'}`} />
             <div className="text-[10px] font-bold text-slate-500 uppercase">Phase 01</div>
-            <div className="text-sm font-semibold">{isPhaseVerified(LockPhase.PROXIMITY) ? 'Verified' : 'Proximity'}</div>
+            <div className="text-sm font-semibold">{isPhaseVerified(LockPhase.PROXIMITY) ? 'BT Verified' : 'Bluetooth'}</div>
           </div>
+          {!hasBluetooth && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-xs text-center p-2">Register a Bluetooth device</div>}
         </button>
 
-        <button
+                <button
           onClick={() => onTrigger(LockPhase.FINGERPRINT)}
-          className={`flex-1 min-w-[150px] group relative p-4 border rounded-xl transition-all overflow-hidden ${
+          disabled={!hasPhone}
+          className={`group relative p-4 border rounded-xl transition-all overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed ${
             isPhaseVerified(LockPhase.FINGERPRINT) 
-            ? 'bg-green-900/30 border-green-500/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]' 
+            ? 'bg-green-900/30 border-green-500/50 shadow-[0_0_15px_rgba(74,222,128,0.2)]' 
             : 'bg-slate-900 border-slate-800 hover:bg-green-900/10 hover:border-green-500/30'
           }`}
         >
           <div className="flex flex-col items-center gap-2 relative z-10">
-            <Fingerprint className={`w-6 h-6 transition-colors ${isPhaseVerified(LockPhase.FINGERPRINT) ? 'text-green-400' : 'text-slate-400 group-hover:text-green-400'}`} />
+            <Smartphone className={`w-6 h-6 transition-colors ${isPhaseVerified(LockPhase.FINGERPRINT) ? 'text-green-400' : 'text-slate-400 group-hover:text-green-400'}`} />
             <div className="text-[10px] font-bold text-slate-500 uppercase">Phase 02</div>
-            <div className="text-sm font-semibold">{isPhaseVerified(LockPhase.FINGERPRINT) ? 'Verified' : 'Fingerprint'}</div>
+            <div className="text-sm font-semibold">{isPhaseVerified(LockPhase.FINGERPRINT) ? 'FP Verified' : 'Phone FP'}</div>
           </div>
+           {!hasPhone && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-xs text-center p-2">Register a Phone device</div>}
         </button>
 
-        <button
+                <button
           onClick={() => onTrigger(LockPhase.VEIN)}
-          className={`flex-1 min-w-[150px] group relative p-4 border rounded-xl transition-all overflow-hidden ${
-            isPhaseVerified(LockPhase.VEIN) 
-            ? 'bg-purple-900/30 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)]' 
-            : 'bg-slate-900 border-slate-800 hover:bg-purple-900/10 hover:border-purple-500/30'
-          }`}
+          className={`group relative p-4 border rounded-xl transition-all overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <div className="flex flex-col items-center gap-2 relative z-10">
             <ScanFace className={`w-6 h-6 transition-colors ${isPhaseVerified(LockPhase.VEIN) ? 'text-purple-400' : 'text-slate-400 group-hover:text-purple-400'}`} />
             <div className="text-[10px] font-bold text-slate-500 uppercase">Phase 03</div>
             <div className="text-sm font-semibold">{isPhaseVerified(LockPhase.VEIN) ? 'Verified' : 'Vein Map'}</div>
           </div>
+           <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-xs text-center p-2">Hardware key required</div>
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Cpu, Activity, History, AlertTriangle, RefreshCw, ScanLine, Shield } from 'lucide-react';
-import { LockState, SecurityEvent, LockPhase } from '../types';
+import { LockState, SecurityEvent, LockPhase, RegisteredDevice } from '../types';
 import LockVisualizer from '../components/LockVisualizer';
 import SimulationControls from '../components/SimulationControls';
 import ActivityLog from '../components/ActivityLog';
@@ -15,6 +15,7 @@ interface MonitoringViewProps {
   onReset: () => void;
   timer: number | null;
   toggleFaultMode: () => void;
+  registeredDevices: RegisteredDevice[];
 }
 
 const MonitoringView: React.FC<MonitoringViewProps> = ({ 
@@ -23,7 +24,8 @@ const MonitoringView: React.FC<MonitoringViewProps> = ({
   onTrigger, 
   onReset, 
   timer,
-  toggleFaultMode 
+  toggleFaultMode,
+  registeredDevices
 }) => {
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [auditReport, setAuditReport] = React.useState<string | null>(null);
@@ -70,12 +72,13 @@ const MonitoringView: React.FC<MonitoringViewProps> = ({
           </div>
           
           {lockState.connectionMode === 'SIMULATION' && (
-            <SimulationControls 
+                        <SimulationControls 
               currentPhase={lockState.currentPhase} 
               verifiedPhases={lockState.verifiedPhases}
               isFaultMode={lockState.isFaultMode}
               onTrigger={onTrigger} 
               onToggleFault={toggleFaultMode}
+              registeredDevices={registeredDevices}
             />
           )}
         </div>

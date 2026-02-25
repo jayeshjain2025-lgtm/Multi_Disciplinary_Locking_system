@@ -7,7 +7,8 @@ import {
   Link, 
   RefreshCw,
 } from 'lucide-react';
-import { LockPhase, SecurityEvent, LockState, ConnectionMode, AuthorizedKey } from './types';
+import { LockPhase, SecurityEvent, LockState, ConnectionMode, AuthorizedKey, RegisteredDevice } from './types';
+import { useNativeProximity } from './hooks/useNativeProximity';
 import MonitoringView from './views/MonitoringView';
 import ManagementView from './views/ManagementView';
 import ConnectionView from './views/ConnectionView';
@@ -26,7 +27,8 @@ const App: React.FC = () => {
   });
   
   const [events, setEvents] = useState<SecurityEvent[]>([]);
-  const [authorizedKeys, setAuthorizedKeys] = useState<AuthorizedKey[]>([
+    const [registeredDevices, setRegisteredDevices] = useState<RegisteredDevice[]>([]);
+  const [authorizedKeys, setAuthorizedKeys] = useState<AuthorizedKey[]>([ 
     { id: 'KEY-001', name: 'Master Key A', isFingerprintRegistered: true, isVeinRegistered: true, batteryLevel: 85 }
   ]);
   
@@ -82,6 +84,49 @@ const App: React.FC = () => {
     playFeedback('click');
   }, [addEvent]);
 
+  const authorizedMacs = registeredDevices.filter(d => d.type === 'BLUETOOTH').map(d => d.id);
+
+  const { isScanning, connectedDevice, sendUnlockSignal } = useNativeProximity(
+    authorizedMacs,
+    useCallback(() => {
+      setLockState(prev => {
+        if (!prev.verifiedPhases.includes(LockPhase.PROXIMITY)) {
+          addEvent(LockPhase.PROXIMITY, 'SUCCESS', 'Auto-Unlock: Linked Bluetooth device detected in range.');
+          playFeedback('success');
+          
+          const newVerified = [...prev.verifiedPhases, LockPhase.PROXIMITY];
+          const required = [LockPhase.PROXIMITY, LockPhase.FINGERPRINT, LockPhase.VEIN];
+          const allVerified = required.every(p => newVerified.includes(p));
+
+          if (allVerified) {
+            setTimeout(async () => {
+              // Send the physical unlock signal to the ESP32
+              const signalSent = await sendUnlockSignal();
+              
+              setLockState(current => ({
+                ...current,
+                currentPhase: LockPhase.UNLOCKED,
+                isLocked: false,
+                lastAccess: new Date()
+              }));
+              addEvent(LockPhase.UNLOCKED, 'SUCCESS', signalSent ? 'ESP32 Relay Triggered. System fully disengaged.' : 'All phases verified, but failed to trigger ESP32 relay.');
+            }, 800);
+            return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
+          }
+          return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
+        }
+        return prev;
+      });
+    }, [addEvent, sendUnlockSignal]),
+    useCallback(() => {
+      setLockState(prev => {
+        addEvent(LockPhase.IDLE, 'FAILURE', 'Auto-Lock: Linked Bluetooth device went out of range.');
+        playFeedback('fail');
+        return { ...prev, currentPhase: LockPhase.IDLE, verifiedPhases: [], isLocked: true, activeAlarms: [] };
+      });
+    }, [addEvent])
+  );
+
   useEffect(() => {
     let interval: any;
     if (!lockState.isLocked && lockState.currentPhase === LockPhase.UNLOCKED) {
@@ -125,12 +170,31 @@ const App: React.FC = () => {
         return { ...prev, activeAlarms: [...prev.activeAlarms, `Simulated ${phase} Malfunction`] };
       }
 
-      // HARDWARE/KEY VALIDATION LOGIC
-      const isAnyKeyValid = authorizedKeys.some(k => k.isFingerprintRegistered && k.isVeinRegistered);
-      if (!isAnyKeyValid && phase !== LockPhase.PROXIMITY) {
-         addEvent(phase, 'FAILURE', "Security Breach: Unregistered hardware key detected.");
-         playFeedback('fail');
-         return { ...prev, activeAlarms: [...prev.activeAlarms, "Unauthorized hardware interaction"] };
+      // SIMULATION & HARDWARE VALIDATION LOGIC
+      if (prev.connectionMode === 'SIMULATION') {
+        if (phase === LockPhase.PROXIMITY) {
+          const device = registeredDevices.find(d => d.type === 'BLUETOOTH');
+          if (!device) {
+            addEvent(phase, 'FAILURE', 'Proximity check failed: No registered Bluetooth device in range.');
+            playFeedback('fail');
+            return prev;
+          }
+        }
+        if (phase === LockPhase.FINGERPRINT) {
+          const device = registeredDevices.find(d => d.type === 'PHONE');
+          if (!device) {
+            addEvent(phase, 'FAILURE', 'Biometric scan failed: No registered phone found.');
+            playFeedback('fail');
+            return prev;
+          }
+        }
+      } else { // HARDWARE MODE
+        const isAnyKeyValid = authorizedKeys.some(k => k.isFingerprintRegistered && k.isVeinRegistered);
+        if (!isAnyKeyValid && (phase === LockPhase.FINGERPRINT || phase === LockPhase.VEIN)) {
+           addEvent(phase, 'FAILURE', "Security Breach: Unregistered hardware key detected.");
+           playFeedback('fail');
+           return { ...prev, activeAlarms: [...prev.activeAlarms, "Unauthorized hardware interaction"] };
+        }
       }
 
       // SUCCESSFUL VERIFICATION (NON-LINEAR)
@@ -144,14 +208,17 @@ const App: React.FC = () => {
       const allVerified = required.every(p => newVerified.includes(p));
 
       if (allVerified) {
-        setTimeout(() => {
+        setTimeout(async () => {
+          // Send the physical unlock signal to the ESP32
+          const signalSent = await sendUnlockSignal();
+          
           setLockState(current => ({
             ...current,
             currentPhase: LockPhase.UNLOCKED,
             isLocked: false,
             lastAccess: new Date()
           }));
-          addEvent(LockPhase.UNLOCKED, 'SUCCESS', 'All phases verified. System fully disengaged.');
+          addEvent(LockPhase.UNLOCKED, 'SUCCESS', signalSent ? 'ESP32 Relay Triggered. System fully disengaged.' : 'All phases verified, but failed to trigger ESP32 relay.');
         }, 800);
         return { ...prev, verifiedPhases: newVerified, currentPhase: phase };
       }
@@ -191,19 +258,22 @@ const App: React.FC = () => {
 
       <main className="flex-1">
         {activeTab === 'monitor' && (
-          <MonitoringView 
+                    <MonitoringView 
             lockState={lockState} 
             events={events} 
             onTrigger={handlePhaseTrigger} 
             onReset={() => resetSystem()} 
             timer={autoLockTimer}
             toggleFaultMode={toggleFaultMode}
+            registeredDevices={registeredDevices}
           />
         )}
         {activeTab === 'manage' && (
-          <ManagementView 
+                    <ManagementView 
             authorizedKeys={authorizedKeys} 
-            setAuthorizedKeys={setAuthorizedKeys} 
+            setAuthorizedKeys={setAuthorizedKeys}
+            registeredDevices={registeredDevices}
+            setRegisteredDevices={setRegisteredDevices}
             addEvent={addEvent}
           />
         )}
