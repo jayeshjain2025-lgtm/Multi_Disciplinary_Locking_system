@@ -7,133 +7,30 @@
     <title>TriLock Control Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
-        * {
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 50%, #0f1419 100%);
-            background-attachment: fixed;
-            color: #f1f5f9;
-            position: relative;
-            overflow-x: hidden;
+            background-color: #09090b; /* zinc-950 */
+            color: #f4f4f5; /* zinc-100 */
+            -webkit-font-smoothing: antialiased;
         }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background:
-                radial-gradient(circle at 20% 80%, rgba(14, 165, 233, 0.08) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.04) 0%, transparent 50%);
-            animation: drift 30s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        @keyframes drift {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            50% { transform: translate(50px, 50px) rotate(5deg); }
-        }
-
-        #root {
-            position: relative;
-            z-index: 1;
-        }
-
-        .mono {
-            font-family: 'JetBrains Mono', monospace;
-            letter-spacing: -0.02em;
-        }
-
+        .mono { font-family: 'JetBrains Mono', monospace; }
         .glass {
-            background: rgba(15, 23, 42, 0.4);
-            backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            box-shadow:
-                0 4px 24px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            background: #18181b; /* zinc-900 */
+            border: 1px solid #27272a; /* zinc-800 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-
-        .glow-cyan {
-            box-shadow:
-                0 0 20px rgba(34, 211, 238, 0.3),
-                0 0 40px rgba(34, 211, 238, 0.15),
-                inset 0 0 20px rgba(34, 211, 238, 0.1);
-        }
-
-        .glow-green {
-            box-shadow:
-                0 0 20px rgba(74, 222, 128, 0.3),
-                0 0 40px rgba(74, 222, 128, 0.15),
-                inset 0 0 20px rgba(74, 222, 128, 0.1);
-        }
-
-        .glow-red {
-            box-shadow:
-                0 0 20px rgba(248, 113, 113, 0.3),
-                0 0 40px rgba(248, 113, 113, 0.15);
-        }
-
-        .glow-purple {
-            box-shadow:
-                0 0 20px rgba(168, 85, 247, 0.3),
-                0 0 40px rgba(168, 85, 247, 0.15);
-        }
-
-        button, .glass, [class*="hover:"] {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .scrollbar-thin::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .scrollbar-thin::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.3);
-            border-radius: 3px;
-        }
-
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: rgba(100, 116, 139, 0.5);
-            border-radius: 3px;
-        }
-
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-            background: rgba(148, 163, 184, 0.7);
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .animate-pulse-glow {
-            animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        @keyframes slide-in-right {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        .animate-in {
-            animation: slide-in-right 0.3s ease-out;
-        }
+        /* Keep glow classes for compatibility but make them subtle */
+        .glow-cyan { box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.15); }
+        .glow-green { box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.15); }
+        .glow-red { box-shadow: 0 0 20px -5px rgba(239, 68, 68, 0.15); }
+        .glow-purple { box-shadow: 0 0 20px -5px rgba(168, 85, 247, 0.15); }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
     </style>
 <script type="importmap">
 {

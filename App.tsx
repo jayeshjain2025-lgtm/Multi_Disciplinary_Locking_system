@@ -84,6 +84,8 @@ const App: React.FC = () => {
     playFeedback('click');
   }, [addEvent]);
 
+  const sendUnlockSignalRef = useRef<(() => Promise<boolean>) | null>(null);
+
   const authorizedMacs = registeredDevices.filter(d => d.type === 'BLUETOOTH').map(d => d.id);
 
   const { isScanning, connectedDevice, sendUnlockSignal } = useNativeProximity(
@@ -101,7 +103,7 @@ const App: React.FC = () => {
           if (allVerified) {
             setTimeout(async () => {
               // Send the physical unlock signal to the ESP32
-              const signalSent = await sendUnlockSignal();
+              const signalSent = sendUnlockSignalRef.current ? await sendUnlockSignalRef.current() : false;
               
               setLockState(current => ({
                 ...current,
@@ -117,7 +119,7 @@ const App: React.FC = () => {
         }
         return prev;
       });
-    }, [addEvent, sendUnlockSignal]),
+    }, [addEvent]),
     useCallback(() => {
       setLockState(prev => {
         addEvent(LockPhase.IDLE, 'FAILURE', 'Auto-Lock: Linked Bluetooth device went out of range.');
@@ -126,6 +128,10 @@ const App: React.FC = () => {
       });
     }, [addEvent])
   );
+
+  useEffect(() => {
+    sendUnlockSignalRef.current = sendUnlockSignal;
+  }, [sendUnlockSignal]);
 
   useEffect(() => {
     let interval: any;
@@ -210,7 +216,7 @@ const App: React.FC = () => {
       if (allVerified) {
         setTimeout(async () => {
           // Send the physical unlock signal to the ESP32
-          const signalSent = await sendUnlockSignal();
+          const signalSent = sendUnlockSignalRef.current ? await sendUnlockSignalRef.current() : false;
           
           setLockState(current => ({
             ...current,
@@ -233,69 +239,29 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen p-3 md:p-6 lg:p-8 flex flex-col gap-4 md:gap-6 max-w-[1600px] mx-auto">
-      <header className="glass p-5 md:p-6 lg:p-7 rounded-3xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-transparent to-blue-500/5 pointer-events-none" />
-
-        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-cyan-400/20 blur-xl rounded-full" />
-              <div className="relative bg-gradient-to-br from-cyan-500 to-blue-600 p-2.5 md:p-3 rounded-2xl">
-                <Shield className="text-white w-6 h-6 md:w-8 md:h-8" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-cyan-100 to-blue-100 bg-clip-text text-transparent">
-                TriLock Security
-              </h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${lockState.connectionMode === 'HARDWARE' ? 'bg-green-400 animate-pulse' : 'bg-cyan-400'}`} />
-                <p className="text-xs md:text-sm text-slate-400">
-                  <span className="text-cyan-400 font-semibold uppercase tracking-wider">{lockState.connectionMode}</span>
-                  <span className="text-slate-600 mx-1.5">•</span>
-                  <span className="text-slate-500">Active</span>
-                </p>
-              </div>
-            </div>
+    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass p-6 rounded-2xl">
+        <div className="flex items-center gap-4">
+          <div className="p-2.5 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+            <Shield className="text-zinc-100 w-6 h-6" />
           </div>
-
-          <nav className="flex bg-black/30 backdrop-blur-sm p-1 rounded-2xl border border-white/5 shadow-xl w-full md:w-auto">
-            <button
-              onClick={() => setActiveTab('monitor')}
-              className={`flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all flex-1 md:flex-initial ${
-                activeTab === 'monitor'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Monitor className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">Monitor</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('manage')}
-              className={`flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all flex-1 md:flex-initial ${
-                activeTab === 'manage'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">Manage</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('connect')}
-              className={`flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all flex-1 md:flex-initial ${
-                activeTab === 'connect'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Link className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">Connect</span>
-            </button>
-          </nav>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">TriLock <span className="text-zinc-500 font-normal">PRO</span></h1>
+            <p className="text-zinc-500 text-xs mt-0.5">Environment: <span className="text-emerald-400 font-medium uppercase">{lockState.connectionMode}</span></p>
+          </div>
         </div>
+
+        <nav className="flex bg-zinc-950/50 p-1 rounded-xl border border-zinc-800/80">
+          <button onClick={() => setActiveTab('monitor')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'monitor' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'}`}>
+            <Monitor className="w-4 h-4" /> Monitoring
+          </button>
+          <button onClick={() => setActiveTab('manage')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'manage' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'}`}>
+            <Settings className="w-4 h-4" /> Management
+          </button>
+          <button onClick={() => setActiveTab('connect')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'connect' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'}`}>
+            <Link className="w-4 h-4" /> Connect
+          </button>
+        </nav>
       </header>
 
       <main className="flex-1">
@@ -330,31 +296,17 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="glass p-4 md:p-5 rounded-3xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/20 via-transparent to-slate-900/20 pointer-events-none" />
-        <div className="relative flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-4 md:gap-6 text-slate-400">
-            <span className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <span className="font-medium">System Nominal</span>
-            </span>
-            <span className="flex items-center gap-2 text-slate-500">
-              <span>Protocol:</span>
-              <span className="mono text-cyan-400 font-semibold">BIO-Z v4.2</span>
-            </span>
-          </div>
-          {autoLockTimer !== null && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-xl border border-orange-500/20">
-              <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse-glow" />
-              <span className="text-orange-400 font-bold text-sm">
-                AUTO-LOCK {autoLockTimer}s
-              </span>
-            </div>
-          )}
-          <div className="mono text-slate-600 text-[10px] tracking-wider">
-            SEC_ID: 0x8842
-          </div>
+      <footer className="glass p-4 rounded-2xl flex items-center justify-between text-xs text-zinc-500 font-medium">
+        <div className="flex gap-6">
+          <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Heartbeat: Nominal</span>
+          <span className="flex items-center gap-1">Protocol: Biometric-Z v4</span>
         </div>
+        {autoLockTimer !== null && (
+          <div className="text-red-400 font-bold animate-pulse">
+            AUTO-LOCK IN {autoLockTimer}s
+          </div>
+        )}
+        <div className="mono opacity-40">0x8842_SEC_LINK</div>
       </footer>
     </div>
   );
