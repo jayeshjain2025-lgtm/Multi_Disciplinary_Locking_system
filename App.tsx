@@ -233,27 +233,69 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass p-6 rounded-2xl">
-        <div className="flex items-center gap-4">
-          <Shield className="text-cyan-400 w-10 h-10" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">TriLock Security <span className="text-slate-500 font-light">PRO</span></h1>
-            <p className="text-slate-400 text-xs">Environment: <span className="text-cyan-400 font-bold uppercase">{lockState.connectionMode}</span></p>
-          </div>
-        </div>
+    <div className="min-h-screen p-3 md:p-6 lg:p-8 flex flex-col gap-4 md:gap-6 max-w-[1600px] mx-auto">
+      <header className="glass p-5 md:p-6 lg:p-7 rounded-3xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-transparent to-blue-500/5 pointer-events-none" />
 
-        <nav className="flex bg-black/40 p-1.5 rounded-xl border border-white/5">
-          <button onClick={() => setActiveTab('monitor')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${activeTab === 'monitor' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-            <Monitor className="w-4 h-4" /> Monitoring
-          </button>
-          <button onClick={() => setActiveTab('manage')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${activeTab === 'manage' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-            <Settings className="w-4 h-4" /> Management
-          </button>
-          <button onClick={() => setActiveTab('connect')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${activeTab === 'connect' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-            <Link className="w-4 h-4" /> Connect
-          </button>
-        </nav>
+        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-cyan-400/20 blur-xl rounded-full" />
+              <div className="relative bg-gradient-to-br from-cyan-500 to-blue-600 p-2.5 md:p-3 rounded-2xl">
+                <Shield className="text-white w-6 h-6 md:w-8 md:h-8" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-cyan-100 to-blue-100 bg-clip-text text-transparent">
+                TriLock Security
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${lockState.connectionMode === 'HARDWARE' ? 'bg-green-400 animate-pulse' : 'bg-cyan-400'}`} />
+                <p className="text-xs md:text-sm text-slate-400">
+                  <span className="text-cyan-400 font-semibold uppercase tracking-wider">{lockState.connectionMode}</span>
+                  <span className="text-slate-600 mx-1.5">•</span>
+                  <span className="text-slate-500">Active</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <nav className="flex bg-black/30 backdrop-blur-sm p-1 rounded-2xl border border-white/5 shadow-xl w-full md:w-auto">
+            <button
+              onClick={() => setActiveTab('monitor')}
+              className={`flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all flex-1 md:flex-initial ${
+                activeTab === 'monitor'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Monitor</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('manage')}
+              className={`flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all flex-1 md:flex-initial ${
+                activeTab === 'manage'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Manage</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('connect')}
+              className={`flex items-center justify-center gap-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-semibold transition-all flex-1 md:flex-initial ${
+                activeTab === 'connect'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Link className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Connect</span>
+            </button>
+          </nav>
+        </div>
       </header>
 
       <main className="flex-1">
@@ -288,17 +330,31 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="glass p-4 rounded-2xl flex items-center justify-between text-xs text-slate-500">
-        <div className="flex gap-6">
-          <span className="flex items-center gap-1">Heartbeat: Nominal</span>
-          <span className="flex items-center gap-1">Protocol: Biometric-Z v4</span>
-        </div>
-        {autoLockTimer !== null && (
-          <div className="text-orange-400 font-bold animate-pulse">
-            AUTO-LOCK IN {autoLockTimer}s
+      <footer className="glass p-4 md:p-5 rounded-3xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/20 via-transparent to-slate-900/20 pointer-events-none" />
+        <div className="relative flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-4 md:gap-6 text-slate-400">
+            <span className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              <span className="font-medium">System Nominal</span>
+            </span>
+            <span className="flex items-center gap-2 text-slate-500">
+              <span>Protocol:</span>
+              <span className="mono text-cyan-400 font-semibold">BIO-Z v4.2</span>
+            </span>
           </div>
-        )}
-        <div className="mono opacity-50">0x8842_SEC_LINK</div>
+          {autoLockTimer !== null && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-xl border border-orange-500/20">
+              <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse-glow" />
+              <span className="text-orange-400 font-bold text-sm">
+                AUTO-LOCK {autoLockTimer}s
+              </span>
+            </div>
+          )}
+          <div className="mono text-slate-600 text-[10px] tracking-wider">
+            SEC_ID: 0x8842
+          </div>
+        </div>
       </footer>
     </div>
   );

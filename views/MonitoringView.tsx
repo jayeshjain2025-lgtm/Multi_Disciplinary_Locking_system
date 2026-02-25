@@ -83,30 +83,64 @@ const MonitoringView: React.FC<MonitoringViewProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass p-5 rounded-2xl flex flex-col gap-2">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-bold uppercase">Lock Health</span>
-              <Activity className="w-4 h-4 text-cyan-400" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+          <div className="glass p-5 md:p-6 rounded-2xl flex flex-col gap-3 relative overflow-hidden group hover:border-cyan-400/20 transition-all">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/5 rounded-full blur-3xl group-hover:bg-cyan-400/10 transition-all" />
+            <div className="relative flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Lock Health</span>
+              <div className="p-2 bg-cyan-400/10 rounded-lg">
+                <Activity className="w-4 h-4 text-cyan-400" />
+              </div>
             </div>
-            <div className="text-2xl font-bold mono">{lockState.batteryLevel}%</div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-cyan-400 h-full" style={{ width: `${lockState.batteryLevel}%` }} />
+            <div className="relative text-3xl md:text-4xl font-black mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+              {lockState.batteryLevel}%
+            </div>
+            <div className="relative w-full bg-slate-800/50 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-cyan-500/50"
+                style={{ width: `${lockState.batteryLevel}%` }}
+              />
             </div>
           </div>
-          <div className="glass p-5 rounded-2xl flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase text-slate-400">Last Event</span>
-            <div className="text-xl font-bold truncate">
+
+          <div className="glass p-5 md:p-6 rounded-2xl flex flex-col gap-3 relative overflow-hidden group hover:border-blue-400/20 transition-all">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/5 rounded-full blur-3xl group-hover:bg-blue-400/10 transition-all" />
+            <div className="relative flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Last Event</span>
+              <div className="p-2 bg-blue-400/10 rounded-lg">
+                <History className="w-4 h-4 text-blue-400" />
+              </div>
+            </div>
+            <div className="relative text-xl md:text-2xl font-bold truncate">
               {lockState.lastAccess ? lockState.lastAccess.toLocaleTimeString() : 'IDLE'}
             </div>
-            <span className="text-xs text-slate-500 flex items-center gap-1"><History className="w-3 h-3" /> System Stable</span>
+            <span className="relative text-xs text-slate-500 flex items-center gap-2 font-medium">
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              System Stable
+            </span>
           </div>
-          <div className="glass p-5 rounded-2xl flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase text-slate-400">Anomalies</span>
-            <div className={`text-2xl font-bold ${lockState.activeAlarms.length > 0 ? 'text-red-500 animate-pulse' : 'text-slate-200'}`}>
+
+          <div className="glass p-5 md:p-6 rounded-2xl flex flex-col gap-3 relative overflow-hidden group hover:border-red-400/20 transition-all">
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl transition-all ${
+              lockState.activeAlarms.length > 0 ? 'bg-red-400/20' : 'bg-slate-400/5'
+            }`} />
+            <div className="relative flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Anomalies</span>
+              <div className={`p-2 rounded-lg ${lockState.activeAlarms.length > 0 ? 'bg-red-400/20' : 'bg-slate-400/10'}`}>
+                <AlertTriangle className={`w-4 h-4 ${lockState.activeAlarms.length > 0 ? 'text-red-400' : 'text-slate-500'}`} />
+              </div>
+            </div>
+            <div className={`relative text-3xl md:text-4xl font-black mono ${
+              lockState.activeAlarms.length > 0
+                ? 'text-red-400 animate-pulse-glow'
+                : 'text-slate-300'
+            }`}>
               {lockState.activeAlarms.length}
             </div>
-            <span className="text-xs text-slate-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Security Scans Active</span>
+            <span className="relative text-xs text-slate-500 flex items-center gap-2 font-medium">
+              <div className={`w-1.5 h-1.5 rounded-full ${lockState.activeAlarms.length > 0 ? 'bg-red-400 animate-pulse' : 'bg-slate-600'}`} />
+              Security Scans Active
+            </span>
           </div>
         </div>
       </div>
