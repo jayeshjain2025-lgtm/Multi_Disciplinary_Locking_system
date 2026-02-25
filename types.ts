@@ -26,6 +26,12 @@ export interface SecurityEvent {
   source: ConnectionMode;
 }
 
+export interface RegisteredDevice {
+  id: string;
+  name: string;
+  type: 'BLUETOOTH' | 'PHONE';
+}
+
 export interface LockState {
   currentPhase: LockPhase;
   verifiedPhases: LockPhase[];

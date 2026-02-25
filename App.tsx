@@ -7,7 +7,8 @@ import {
   Link, 
   RefreshCw,
 } from 'lucide-react';
-import { LockPhase, SecurityEvent, LockState, ConnectionMode, AuthorizedKey } from './types';
+import { LockPhase, SecurityEvent, LockState, ConnectionMode, AuthorizedKey, RegisteredDevice } from './types';
+import { useNativeProximity } from './hooks/useNativeProximity';
 import MonitoringView from './views/MonitoringView';
 import ManagementView from './views/ManagementView';
 import ConnectionView from './views/ConnectionView';
@@ -26,7 +27,8 @@ const App: React.FC = () => {
   });
   
   const [events, setEvents] = useState<SecurityEvent[]>([]);
-  const [authorizedKeys, setAuthorizedKeys] = useState<AuthorizedKey[]>([
+    const [registeredDevices, setRegisteredDevices] = useState<RegisteredDevice[]>([]);
+  const [authorizedKeys, setAuthorizedKeys] = useState<AuthorizedKey[]>([ 
     { id: 'KEY-001', name: 'Master Key A', isFingerprintRegistered: true, isVeinRegistered: true, batteryLevel: 85 }
   ]);
   
@@ -82,6 +84,55 @@ const App: React.FC = () => {
     playFeedback('click');
   }, [addEvent]);
 
+  const sendUnlockSignalRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  const authorizedMacs = registeredDevices.filter(d => d.type === 'BLUETOOTH').map(d => d.id);
+
+  const { isScanning, connectedDevice, sendUnlockSignal } = useNativeProximity(
+    authorizedMacs,
+    useCallback(() => {
+      setLockState(prev => {
+        if (!prev.verifiedPhases.includes(LockPhase.PROXIMITY)) {
+          addEvent(LockPhase.PROXIMITY, 'SUCCESS', 'Auto-Unlock: Linked Bluetooth device detected in range.');
+          playFeedback('success');
+          
+          const newVerified = [...prev.verifiedPhases, LockPhase.PROXIMITY];
+          const required = [LockPhase.PROXIMITY, LockPhase.FINGERPRINT, LockPhase.VEIN];
+          const allVerified = required.every(p => newVerified.includes(p));
+
+          if (allVerified) {
+            setTimeout(async () => {
+              // Send the physical unlock signal to the ESP32
+              const signalSent = sendUnlockSignalRef.current ? await sendUnlockSignalRef.current() : false;
+              
+              setLockState(current => ({
+                ...current,
+                currentPhase: LockPhase.UNLOCKED,
+                isLocked: false,
+                lastAccess: new Date()
+              }));
+              addEvent(LockPhase.UNLOCKED, 'SUCCESS', signalSent ? 'ESP32 Relay Triggered. System fully disengaged.' : 'All phases verified, but failed to trigger ESP32 relay.');
+            }, 800);
+            return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
+          }
+          return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
+        }
+        return prev;
+      });
+    }, [addEvent]),
+    useCallback(() => {
+      setLockState(prev => {
+        addEvent(LockPhase.IDLE, 'FAILURE', 'Auto-Lock: Linked Bluetooth device went out of range.');
+        playFeedback('fail');
+        return { ...prev, currentPhase: LockPhase.IDLE, verifiedPhases: [], isLocked: true, activeAlarms: [] };
+      });
+    }, [addEvent])
+  );
+
+  useEffect(() => {
+    sendUnlockSignalRef.current = sendUnlockSignal;
+  }, [sendUnlockSignal]);
+
   useEffect(() => {
     let interval: any;
     if (!lockState.isLocked && lockState.currentPhase === LockPhase.UNLOCKED) {
@@ -125,12 +176,31 @@ const App: React.FC = () => {
         return { ...prev, activeAlarms: [...prev.activeAlarms, `Simulated ${phase} Malfunction`] };
       }
 
-      // HARDWARE/KEY VALIDATION LOGIC
-      const isAnyKeyValid = authorizedKeys.some(k => k.isFingerprintRegistered && k.isVeinRegistered);
-      if (!isAnyKeyValid && phase !== LockPhase.PROXIMITY) {
-         addEvent(phase, 'FAILURE', "Security Breach: Unregistered hardware key detected.");
-         playFeedback('fail');
-         return { ...prev, activeAlarms: [...prev.activeAlarms, "Unauthorized hardware interaction"] };
+      // SIMULATION & HARDWARE VALIDATION LOGIC
+      if (prev.connectionMode === 'SIMULATION') {
+        if (phase === LockPhase.PROXIMITY) {
+          const device = registeredDevices.find(d => d.type === 'BLUETOOTH');
+          if (!device) {
+            addEvent(phase, 'FAILURE', 'Proximity check failed: No registered Bluetooth device in range.');
+            playFeedback('fail');
+            return prev;
+          }
+        }
+        if (phase === LockPhase.FINGERPRINT) {
+          const device = registeredDevices.find(d => d.type === 'PHONE');
+          if (!device) {
+            addEvent(phase, 'FAILURE', 'Biometric scan failed: No registered phone found.');
+            playFeedback('fail');
+            return prev;
+          }
+        }
+      } else { // HARDWARE MODE
+        const isAnyKeyValid = authorizedKeys.some(k => k.isFingerprintRegistered && k.isVeinRegistered);
+        if (!isAnyKeyValid && (phase === LockPhase.FINGERPRINT || phase === LockPhase.VEIN)) {
+           addEvent(phase, 'FAILURE', "Security Breach: Unregistered hardware key detected.");
+           playFeedback('fail');
+           return { ...prev, activeAlarms: [...prev.activeAlarms, "Unauthorized hardware interaction"] };
+        }
       }
 
       // SUCCESSFUL VERIFICATION (NON-LINEAR)
@@ -144,14 +214,17 @@ const App: React.FC = () => {
       const allVerified = required.every(p => newVerified.includes(p));
 
       if (allVerified) {
-        setTimeout(() => {
+        setTimeout(async () => {
+          // Send the physical unlock signal to the ESP32
+          const signalSent = sendUnlockSignalRef.current ? await sendUnlockSignalRef.current() : false;
+          
           setLockState(current => ({
             ...current,
             currentPhase: LockPhase.UNLOCKED,
             isLocked: false,
             lastAccess: new Date()
           }));
-          addEvent(LockPhase.UNLOCKED, 'SUCCESS', 'All phases verified. System fully disengaged.');
+          addEvent(LockPhase.UNLOCKED, 'SUCCESS', signalSent ? 'ESP32 Relay Triggered. System fully disengaged.' : 'All phases verified, but failed to trigger ESP32 relay.');
         }, 800);
         return { ...prev, verifiedPhases: newVerified, currentPhase: phase };
       }
@@ -169,21 +242,23 @@ const App: React.FC = () => {
     <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass p-6 rounded-2xl">
         <div className="flex items-center gap-4">
-          <Shield className="text-cyan-400 w-10 h-10" />
+          <div className="p-2.5 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+            <Shield className="text-zinc-100 w-6 h-6" />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">TriLock Security <span className="text-slate-500 font-light">PRO</span></h1>
-            <p className="text-slate-400 text-xs">Environment: <span className="text-cyan-400 font-bold uppercase">{lockState.connectionMode}</span></p>
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">TriLock <span className="text-zinc-500 font-normal">PRO</span></h1>
+            <p className="text-zinc-500 text-xs mt-0.5">Environment: <span className="text-emerald-400 font-medium uppercase">{lockState.connectionMode}</span></p>
           </div>
         </div>
 
-        <nav className="flex bg-black/40 p-1.5 rounded-xl border border-white/5">
-          <button onClick={() => setActiveTab('monitor')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${activeTab === 'monitor' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
+        <nav className="flex bg-zinc-950/50 p-1 rounded-xl border border-zinc-800/80">
+          <button onClick={() => setActiveTab('monitor')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'monitor' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'}`}>
             <Monitor className="w-4 h-4" /> Monitoring
           </button>
-          <button onClick={() => setActiveTab('manage')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${activeTab === 'manage' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button onClick={() => setActiveTab('manage')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'manage' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'}`}>
             <Settings className="w-4 h-4" /> Management
           </button>
-          <button onClick={() => setActiveTab('connect')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${activeTab === 'connect' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button onClick={() => setActiveTab('connect')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'connect' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'}`}>
             <Link className="w-4 h-4" /> Connect
           </button>
         </nav>
@@ -191,19 +266,22 @@ const App: React.FC = () => {
 
       <main className="flex-1">
         {activeTab === 'monitor' && (
-          <MonitoringView 
+                    <MonitoringView 
             lockState={lockState} 
             events={events} 
             onTrigger={handlePhaseTrigger} 
             onReset={() => resetSystem()} 
             timer={autoLockTimer}
             toggleFaultMode={toggleFaultMode}
+            registeredDevices={registeredDevices}
           />
         )}
         {activeTab === 'manage' && (
-          <ManagementView 
+                    <ManagementView 
             authorizedKeys={authorizedKeys} 
-            setAuthorizedKeys={setAuthorizedKeys} 
+            setAuthorizedKeys={setAuthorizedKeys}
+            registeredDevices={registeredDevices}
+            setRegisteredDevices={setRegisteredDevices}
             addEvent={addEvent}
           />
         )}
@@ -218,17 +296,17 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="glass p-4 rounded-2xl flex items-center justify-between text-xs text-slate-500">
+      <footer className="glass p-4 rounded-2xl flex items-center justify-between text-xs text-zinc-500 font-medium">
         <div className="flex gap-6">
-          <span className="flex items-center gap-1">Heartbeat: Nominal</span>
+          <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Heartbeat: Nominal</span>
           <span className="flex items-center gap-1">Protocol: Biometric-Z v4</span>
         </div>
         {autoLockTimer !== null && (
-          <div className="text-orange-400 font-bold animate-pulse">
+          <div className="text-red-400 font-bold animate-pulse">
             AUTO-LOCK IN {autoLockTimer}s
           </div>
         )}
-        <div className="mono opacity-50">0x8842_SEC_LINK</div>
+        <div className="mono opacity-40">0x8842_SEC_LINK</div>
       </footer>
     </div>
   );
