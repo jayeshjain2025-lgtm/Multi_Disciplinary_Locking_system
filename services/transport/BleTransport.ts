@@ -102,12 +102,6 @@ export class BleTransport implements ITransport {
   async sendCommand(command: LockCommand): Promise<void> {
     const phase = command.payload?.phase as 1 | 2 | 3 | undefined;
 
-    if (phase === 2) {
-      // Phase 2: Fingerprint on key (phone) - use WebAuthn
-      await this._handleFingerprintAuth(command);
-      return;
-    }
-
     if (phase === 3) {
       // Phase 3: Vein sensor on lock - simulated for demo
       await this._simulateVeinAuth(command);
@@ -119,6 +113,9 @@ export class BleTransport implements ITransport {
     }
 
     // Encode command as JSON → UTF-8 bytes
+    // For phase 1 and 2, ESP32 handles:
+    // Phase 1: Proximity detection (ESP32 checks RSSI and BLE address)
+    // Phase 2: Fingerprint verification (ESP32 reads from R303/R503 sensor)
     const json = JSON.stringify(command);
     const encoder = new TextEncoder();
     await this.commandChar.writeValueWithResponse(encoder.encode(json));
@@ -137,47 +134,6 @@ export class BleTransport implements ITransport {
   }
 
   // ── Internal ────────────────────────────────────────────────
-
-  private async _handleFingerprintAuth(command: LockCommand): Promise<void> {
-    try {
-      // Use WebAuthn for fingerprint authentication on the phone
-      const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge: new Uint8Array(32), // Random challenge
-          rpId: window.location.hostname,
-          userVerification: 'required', // Requires biometric
-          timeout: 60000,
-        },
-      });
-
-      if (credential) {
-        // Success
-        this._emitEvent({
-          id: generateId(),
-          timestamp: new Date(),
-          type: 'PHASE_UNLOCKED',
-          source: 'FINGERPRINT',
-          phase: 2,
-          keyId: (command.payload?.keyId as string) ?? 'PHONE-KEY',
-          nonce: generateId(),
-        });
-      } else {
-        throw new Error('Authentication failed');
-      }
-    } catch (error) {
-      // Failure
-      this._emitEvent({
-        id: generateId(),
-        timestamp: new Date(),
-        type: 'PHASE_FAILED',
-        source: 'FINGERPRINT',
-        phase: 2,
-        keyId: (command.payload?.keyId as string) ?? 'PHONE-KEY',
-        nonce: generateId(),
-        metadata: { reason: 'Fingerprint authentication failed' },
-      });
-    }
-  }
 
   private async _simulateVeinAuth(command: LockCommand): Promise<void> {
     // Simulate vein scan delay
