@@ -40,14 +40,14 @@ const ConnectionView: React.FC<ConnectionViewProps> = ({ mode, setMode }) => {
         </div>
 
         <div 
-          onClick={() => setMode('HARDWARE')}
-          className={`group cursor-pointer p-8 rounded-3xl border-2 transition-all flex flex-col gap-6 ${mode === 'HARDWARE' ? 'bg-purple-500/5 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}
+          onClick={() => setMode('BLE')}
+          className={`group cursor-pointer p-8 rounded-3xl border-2 transition-all flex flex-col gap-6 ${mode === 'BLE' ? 'bg-purple-500/5 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}
         >
           <div className="flex justify-between items-start">
-            <div className={`p-4 rounded-2xl ${mode === 'HARDWARE' ? 'bg-purple-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
+            <div className={`p-4 rounded-2xl ${mode === 'BLE' ? 'bg-purple-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}>
               <Smartphone className="w-8 h-8" />
             </div>
-            {mode === 'HARDWARE' && <CheckCircle2 className="text-purple-400 w-6 h-6" />}
+            {mode === 'BLE' && <CheckCircle2 className="text-purple-400 w-6 h-6" />}
           </div>
           <div>
             <h3 className="text-xl font-bold mb-2 text-zinc-100">Hardware Link</h3>
@@ -55,7 +55,7 @@ const ConnectionView: React.FC<ConnectionViewProps> = ({ mode, setMode }) => {
               Pair with physical TriLock devices via Bluetooth Low Energy (BLE) or Secure MQTT. Real-time sensor feedback.
             </p>
           </div>
-          {mode === 'HARDWARE' ? (
+          {mode === 'BLE' ? (
             <div className="flex flex-col gap-3 p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
                <div className="flex items-center justify-between text-xs font-bold text-purple-400">
                  <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> SCANNING FOR DEVICES...</span>

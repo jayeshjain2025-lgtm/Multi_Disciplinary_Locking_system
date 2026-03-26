@@ -8,7 +8,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { LockPhase, SecurityEvent, LockState, ConnectionMode, AuthorizedKey, RegisteredDevice } from './types';
-import { useNativeProximity } from './hooks/useNativeProximity';
+import { useTransport } from './hooks/useTransport';
+import { LockEvent } from './services/transport/ITransport';
 import MonitoringView from './views/MonitoringView';
 import ManagementView from './views/ManagementView';
 import ConnectionView from './views/ConnectionView';
@@ -22,12 +23,12 @@ const App: React.FC = () => {
     batteryLevel: 94,
     lastAccess: null,
     activeAlarms: [],
-    connectionMode: 'SIMULATION',
+    connectionMode: 'BLE',
     isFaultMode: false,
   });
   
   const [events, setEvents] = useState<SecurityEvent[]>([]);
-    const [registeredDevices, setRegisteredDevices] = useState<RegisteredDevice[]>([]);
+  const [registeredDevices, setRegisteredDevices] = useState<RegisteredDevice[]>([]);
   const [authorizedKeys, setAuthorizedKeys] = useState<AuthorizedKey[]>([ 
     { id: 'KEY-001', name: 'Master Key A', isFingerprintRegistered: true, isVeinRegistered: true, batteryLevel: 85 }
   ]);
@@ -71,6 +72,16 @@ const App: React.FC = () => {
     setEvents(prev => [newEvent, ...prev].slice(0, 50));
   }, [lockState.connectionMode]);
 
+  const { transport, status, connect, disconnect } = useTransport({
+    mode: lockState.connectionMode,
+    simulationConfig: {
+      proximityFailureRate: lockState.isFaultMode ? 1.0 : 0,
+      fingerprintFailureRate: lockState.isFaultMode ? 1.0 : 0,
+      veinFailureRate: lockState.isFaultMode ? 1.0 : 0,
+      autoUnlockAllPhases: false
+    }
+  });
+
   const resetSystem = useCallback((rawReason?: any) => {
     const reason = (typeof rawReason === 'string' && rawReason) ? rawReason : "System manually reset.";
     setLockState(prev => ({
@@ -82,56 +93,96 @@ const App: React.FC = () => {
     }));
     addEvent(LockPhase.IDLE, 'PENDING', reason);
     playFeedback('click');
-  }, [addEvent]);
-
-  const sendUnlockSignalRef = useRef<(() => Promise<boolean>) | null>(null);
-
-  const authorizedMacs = registeredDevices.filter(d => d.type === 'BLUETOOTH').map(d => d.id);
-
-  const { isScanning, connectedDevice, sendUnlockSignal } = useNativeProximity(
-    authorizedMacs,
-    useCallback(() => {
-      setLockState(prev => {
-        if (!prev.verifiedPhases.includes(LockPhase.PROXIMITY)) {
-          addEvent(LockPhase.PROXIMITY, 'SUCCESS', 'Auto-Unlock: Linked Bluetooth device detected in range.');
-          playFeedback('success');
-          
-          const newVerified = [...prev.verifiedPhases, LockPhase.PROXIMITY];
-          const required = [LockPhase.PROXIMITY, LockPhase.FINGERPRINT, LockPhase.VEIN];
-          const allVerified = required.every(p => newVerified.includes(p));
-
-          if (allVerified) {
-            setTimeout(async () => {
-              // Send the physical unlock signal to the ESP32
-              const signalSent = sendUnlockSignalRef.current ? await sendUnlockSignalRef.current() : false;
-              
-              setLockState(current => ({
-                ...current,
-                currentPhase: LockPhase.UNLOCKED,
-                isLocked: false,
-                lastAccess: new Date()
-              }));
-              addEvent(LockPhase.UNLOCKED, 'SUCCESS', signalSent ? 'ESP32 Relay Triggered. System fully disengaged.' : 'All phases verified, but failed to trigger ESP32 relay.');
-            }, 800);
-            return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
-          }
-          return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
-        }
-        return prev;
-      });
-    }, [addEvent]),
-    useCallback(() => {
-      setLockState(prev => {
-        addEvent(LockPhase.IDLE, 'FAILURE', 'Auto-Lock: Linked Bluetooth device went out of range.');
-        playFeedback('fail');
-        return { ...prev, currentPhase: LockPhase.IDLE, verifiedPhases: [], isLocked: true, activeAlarms: [] };
-      });
-    }, [addEvent])
-  );
+    if (transport) {
+      transport.sendCommand({ id: Math.random().toString(), type: 'FORCE_LOCK' }).catch(console.error);
+    }
+  }, [addEvent, transport]);
 
   useEffect(() => {
-    sendUnlockSignalRef.current = sendUnlockSignal;
-  }, [sendUnlockSignal]);
+    if (!transport) return;
+
+    const handleLockEvent = (event: LockEvent) => {
+      let phase = LockPhase.IDLE;
+      if (event.phase === 1) phase = LockPhase.PROXIMITY;
+      if (event.phase === 2) phase = LockPhase.FINGERPRINT;
+      if (event.phase === 3) phase = LockPhase.VEIN;
+
+      let status: 'SUCCESS' | 'FAILURE' | 'PENDING' = 'PENDING';
+      if (event.type === 'PHASE_UNLOCKED' || event.type === 'LOCK_DISENGAGED') status = 'SUCCESS';
+      if (event.type === 'PHASE_FAILED' || event.type === 'FAULT' || event.type === 'ALARM') status = 'FAILURE';
+
+      const details = event.metadata?.reason ? String(event.metadata.reason) : event.type;
+
+      if (event.type === 'PROXIMITY_DETECTED') {
+        addEvent(LockPhase.PROXIMITY, 'SUCCESS', 'Auto-Unlock: Linked Bluetooth device detected in range.');
+        playFeedback('success');
+        setLockState(prev => {
+          if (!prev.verifiedPhases.includes(LockPhase.PROXIMITY)) {
+            const newVerified = [...prev.verifiedPhases, LockPhase.PROXIMITY];
+            const required = [LockPhase.PROXIMITY, LockPhase.FINGERPRINT, LockPhase.VEIN];
+            if (required.every(p => newVerified.includes(p))) {
+              transport.sendCommand({ id: Math.random().toString(), type: 'FORCE_UNLOCK' }).catch(console.error);
+            }
+            return { ...prev, verifiedPhases: newVerified, currentPhase: LockPhase.PROXIMITY };
+          }
+          return prev;
+        });
+        return;
+      }
+
+      if (event.type === 'PROXIMITY_LOST') {
+        addEvent(LockPhase.IDLE, 'FAILURE', 'Auto-Lock: Linked Bluetooth device went out of range.');
+        playFeedback('fail');
+        setLockState(prev => ({ ...prev, currentPhase: LockPhase.IDLE, verifiedPhases: [], isLocked: true, activeAlarms: [] }));
+        transport.sendCommand({ id: Math.random().toString(), type: 'FORCE_LOCK' }).catch(console.error);
+        return;
+      }
+
+      if (event.type === 'CONNECTION_ESTABLISHED') {
+        addEvent(LockPhase.IDLE, 'SUCCESS', 'Transport connection established.');
+        return;
+      }
+
+      if (event.type === 'CONNECTION_LOST') {
+        addEvent(LockPhase.IDLE, 'FAILURE', 'Transport connection lost.');
+        setLockState(prev => ({ ...prev, currentPhase: LockPhase.IDLE, verifiedPhases: [], isLocked: true }));
+        return;
+      }
+
+      addEvent(phase, status, details);
+
+      setLockState(prev => {
+        if (event.type === 'PHASE_UNLOCKED' && event.phase) {
+          playFeedback('success');
+          const newVerified = [...prev.verifiedPhases, phase];
+          const required = [LockPhase.PROXIMITY, LockPhase.FINGERPRINT, LockPhase.VEIN];
+          if (required.every(p => newVerified.includes(p))) {
+            transport.sendCommand({ id: Math.random().toString(), type: 'FORCE_UNLOCK' }).catch(console.error);
+          }
+          return { ...prev, verifiedPhases: newVerified, currentPhase: phase };
+        }
+        
+        if (event.type === 'PHASE_FAILED') {
+          playFeedback('fail');
+          return { ...prev, activeAlarms: [...prev.activeAlarms, `${phase} Verification Failed`] };
+        }
+
+        if (event.type === 'LOCK_DISENGAGED') {
+          playFeedback('success');
+          return { ...prev, currentPhase: LockPhase.UNLOCKED, isLocked: false, lastAccess: new Date() };
+        }
+        
+        if (event.type === 'LOCK_ENGAGED') {
+          return { ...prev, currentPhase: LockPhase.IDLE, isLocked: true, verifiedPhases: [] };
+        }
+        
+        return prev;
+      });
+    };
+
+    transport.onEvent(handleLockEvent);
+    return () => transport.offEvent(handleLockEvent);
+  }, [transport, addEvent]);
 
   useEffect(() => {
     let interval: any;
@@ -157,7 +208,6 @@ const App: React.FC = () => {
     playFeedback('click');
 
     setLockState(prev => {
-      // DISCONNECT LOGIC: If clicking a phase that is already verified, remove it.
       if (prev.verifiedPhases.includes(phase)) {
         const newVerified = prev.verifiedPhases.filter(p => p !== phase);
         addEvent(phase, 'PENDING', `Parameter disconnected: ${phase.replace('_VERIFIED', '')}`);
@@ -168,70 +218,24 @@ const App: React.FC = () => {
           isLocked: true 
         };
       }
-
-      // FAULT INJECTION LOGIC
-      if (prev.isFaultMode && prev.connectionMode === 'SIMULATION') {
-        addEvent(phase, 'FAILURE', `Fault Injection: Hardware malfunction detected in ${phase.replace('_VERIFIED', '')} circuit.`);
-        playFeedback('fail');
-        return { ...prev, activeAlarms: [...prev.activeAlarms, `Simulated ${phase} Malfunction`] };
-      }
-
-      // SIMULATION & HARDWARE VALIDATION LOGIC
-      if (prev.connectionMode === 'SIMULATION') {
-        if (phase === LockPhase.PROXIMITY) {
-          const device = registeredDevices.find(d => d.type === 'BLUETOOTH');
-          if (!device) {
-            addEvent(phase, 'FAILURE', 'Proximity check failed: No registered Bluetooth device in range.');
-            playFeedback('fail');
-            return prev;
-          }
-        }
-        if (phase === LockPhase.FINGERPRINT) {
-          const device = registeredDevices.find(d => d.type === 'PHONE');
-          if (!device) {
-            addEvent(phase, 'FAILURE', 'Biometric scan failed: No registered phone found.');
-            playFeedback('fail');
-            return prev;
-          }
-        }
-      } else { // HARDWARE MODE
-        const isAnyKeyValid = authorizedKeys.some(k => k.isFingerprintRegistered && k.isVeinRegistered);
-        if (!isAnyKeyValid && (phase === LockPhase.FINGERPRINT || phase === LockPhase.VEIN)) {
-           addEvent(phase, 'FAILURE', "Security Breach: Unregistered hardware key detected.");
-           playFeedback('fail');
-           return { ...prev, activeAlarms: [...prev.activeAlarms, "Unauthorized hardware interaction"] };
-        }
-      }
-
-      // SUCCESSFUL VERIFICATION (NON-LINEAR)
-      const newVerified = [...prev.verifiedPhases, phase];
-      const details = `${phase.replace('_VERIFIED', '')} signal successfully captured and verified.`;
-      addEvent(phase, 'SUCCESS', details);
-      playFeedback('success');
-
-      // Check if all 3 biometric/proximity steps are complete
-      const required = [LockPhase.PROXIMITY, LockPhase.FINGERPRINT, LockPhase.VEIN];
-      const allVerified = required.every(p => newVerified.includes(p));
-
-      if (allVerified) {
-        setTimeout(async () => {
-          // Send the physical unlock signal to the ESP32
-          const signalSent = sendUnlockSignalRef.current ? await sendUnlockSignalRef.current() : false;
-          
-          setLockState(current => ({
-            ...current,
-            currentPhase: LockPhase.UNLOCKED,
-            isLocked: false,
-            lastAccess: new Date()
-          }));
-          addEvent(LockPhase.UNLOCKED, 'SUCCESS', signalSent ? 'ESP32 Relay Triggered. System fully disengaged.' : 'All phases verified, but failed to trigger ESP32 relay.');
-        }, 800);
-        return { ...prev, verifiedPhases: newVerified, currentPhase: phase };
-      }
-
-      return { ...prev, verifiedPhases: newVerified, currentPhase: phase };
+      return prev;
     });
-  }, [addEvent, authorizedKeys, resetSystem]);
+
+    if (!transport) return;
+
+    let phaseNum: 1 | 2 | 3 | undefined;
+    if (phase === LockPhase.PROXIMITY) phaseNum = 1;
+    if (phase === LockPhase.FINGERPRINT) phaseNum = 2;
+    if (phase === LockPhase.VEIN) phaseNum = 3;
+
+    if (phaseNum) {
+      transport.sendCommand({
+        id: Math.random().toString(),
+        type: 'REQUEST_PHASE_UNLOCK',
+        payload: { phase: phaseNum }
+      }).catch(console.error);
+    }
+  }, [transport, addEvent]);
 
   const toggleFaultMode = useCallback(() => {
     setLockState(prev => ({ ...prev, isFaultMode: !prev.isFaultMode }));

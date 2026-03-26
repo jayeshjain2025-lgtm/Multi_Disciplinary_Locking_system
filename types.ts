@@ -7,7 +7,7 @@ export enum LockPhase {
   UNLOCKED = 'UNLOCKED'
 }
 
-export type ConnectionMode = 'SIMULATION' | 'HARDWARE';
+export type ConnectionMode = 'SIMULATION' | 'BLE';
 
 export interface AuthorizedKey {
   id: string;

@@ -63,25 +63,34 @@ Run the following command to install all required Node packages:
 npm install
 ```
 
-### 3. Build the Web Assets
+### 3. Add Your Gemini API Key
+The app uses Google's Gemini AI for the Security Audit feature. Since API keys are completely hidden and never committed to the repository, you must provide your own locally:
+1. Create a new file in the root directory named `.env`
+2. Add your Gemini API key to the file like this:
+   ```env
+   GEMINI_API_KEY=your_actual_api_key_here
+   ```
+*(You can get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey))*
+
+### 4. Build the Web Assets
 Compile the React/TypeScript code into static web assets:
 ```bash
 npm run build
 ```
 
-### 4. Sync with Capacitor (Android)
+### 5. Sync with Capacitor (Android)
 Copy the built web assets into the native Android project:
 ```bash
 npx cap sync android
 ```
 
-### 5. Open in Android Studio
+### 6. Open in Android Studio
 Launch the Android project directly from your terminal:
 ```bash
 npx cap open android
 ```
 
-### 6. Run the App on Your Phone
+### 7. Run the App on Your Phone
 1. Android Studio will open and begin indexing the project (this takes a minute or two; watch the loading bar at the bottom right).
 2. Using a USB cable connect your phone to your PC. Look at the top toolbar in Android Studio. You should see your physical Android phone listed in the device dropdown menu.
 3. Click the green **Play (Run)** button ▶️ next to your device name.

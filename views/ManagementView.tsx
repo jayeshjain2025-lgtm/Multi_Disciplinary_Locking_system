@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { UserPlus, Trash2, Fingerprint, ScanFace, HardDrive, ShieldCheck, AlertCircle, Smartphone, Bluetooth } from 'lucide-react';
 import { AuthorizedKey, LockPhase, RegisteredDevice } from '../types';
-import { scanForRealDevices } from '../hooks/useNativeProximity';
+import { scanForRealDevices } from '../services/utils/bleScanner';
 import { BleDevice } from '@capacitor-community/bluetooth-le';
 
 interface ManagementViewProps {
